@@ -58,11 +58,11 @@ module "test" {
     }
   ]
   destinations = {
-    azure_monitor_metrics = {
-      this = {
+    azure_monitor_metrics = [
+      {
         name = "azureMonitorMetrics-default"
       }
-    }
+    ]
   }
   location            = azurerm_resource_group.this.location
   name                = "dcr-test"
