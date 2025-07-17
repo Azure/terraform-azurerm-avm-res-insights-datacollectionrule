@@ -36,10 +36,8 @@ The following requirements are needed by this module:
 The following resources are used by this module:
 
 - [azurerm_management_lock.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/management_lock) (resource)
-- [azurerm_private_endpoint.this_managed_dns_zone_groups](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_endpoint) (resource)
-- [azurerm_private_endpoint.this_unmanaged_dns_zone_groups](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_endpoint) (resource)
-- [azurerm_private_endpoint_application_security_group_association.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_endpoint_application_security_group_association) (resource)
-- [azurerm_resource_group.TODO](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) (resource)
+- [azurerm_monitor_data_collection_rule.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/monitor_data_collection_rule) (resource)
+- [azurerm_monitor_diagnostic_setting.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/monitor_diagnostic_setting) (resource)
 - [azurerm_role_assignment.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) (resource)
 - [modtm_telemetry.telemetry](https://registry.terraform.io/providers/azure/modtm/latest/docs/resources/telemetry) (resource)
 - [random_uuid.telemetry](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/uuid) (resource)
@@ -50,6 +48,98 @@ The following resources are used by this module:
 ## Required Inputs
 
 The following input variables are required:
+
+### <a name="input_data_flows"></a> [data\_flows](#input\_data\_flows)
+
+Description: A list of data flow configurations that define how data moves from sources to destinations.
+- `streams` - (Required) A list of streams to be sent to the destinations
+- `destinations` - (Required) A list of destination names where the data will be sent
+- `built_in_transform` - (Optional) The built-in transform to transform stream data
+- `output_stream` - (Optional) The output stream of the transform. Only required if the data flow changes data to a different stream
+- `transform_kql` - (Optional) The KQL query to transform stream data
+
+Type:
+
+```hcl
+list(object({
+    streams            = list(string)
+    destinations       = list(string)
+    built_in_transform = optional(string, null)
+    output_stream      = optional(string, null)
+    transform_kql      = optional(string, null)
+  }))
+```
+
+### <a name="input_destinations"></a> [destinations](#input\_destinations)
+
+Description: The destinations block which defines where the data will be sent. At least one destination must be specified.
+- `azure_monitor_metrics` - (Optional) A list of Azure Monitor Metrics destinations
+  - `name` - (Required) The name of the destination
+- `event_hub` - (Optional) A list of Event Hub destinations
+  - `event_hub_id` - (Required) The resource ID of the Event Hub
+  - `name` - (Required) The name of the destination
+- `event_hub_direct` - (Optional) A list of Event Hub Direct destinations (only available for AgentDirectToStore kind)
+  - `event_hub_id` - (Required) The resource ID of the Event Hub
+  - `name` - (Required) The name of the destination
+- `log_analytics` - (Optional) A list of Log Analytics destinations
+  - `workspace_resource_id` - (Required) The resource ID of the Log Analytics workspace
+  - `name` - (Required) The name of the destination
+- `monitor_account` - (Optional) A list of Monitor Account destinations
+  - `monitor_account_id` - (Required) The resource ID of the Monitor Account
+  - `name` - (Required) The name of the destination
+- `storage_blob` - (Optional) A list of Storage Blob destinations
+  - `storage_account_id` - (Required) The resource ID of the Storage Account
+  - `container_name` - (Required) The name of the container
+  - `name` - (Required) The name of the destination
+- `storage_blob_direct` - (Optional) A list of Storage Blob Direct destinations (only available for AgentDirectToStore kind)
+  - `storage_account_id` - (Required) The resource ID of the Storage Account
+  - `container_name` - (Required) The name of the container
+  - `name` - (Required) The name of the destination
+- `storage_table_direct` - (Optional) A list of Storage Table Direct destinations (only available for AgentDirectToStore kind)
+  - `storage_account_id` - (Required) The resource ID of the Storage Account
+  - `table_name` - (Required) The name of the table
+  - `name` - (Required) The name of the destination
+
+Type:
+
+```hcl
+object({
+    azure_monitor_metrics = optional(list(object({
+      name = string
+    })), [])
+    event_hub = optional(list(object({
+      event_hub_id = string
+      name         = string
+    })), [])
+    event_hub_direct = optional(list(object({
+      event_hub_id = string
+      name         = string
+    })), [])
+    log_analytics = optional(list(object({
+      workspace_resource_id = string
+      name                  = string
+    })), [])
+    monitor_account = optional(list(object({
+      monitor_account_id = string
+      name               = string
+    })), [])
+    storage_blob = optional(list(object({
+      storage_account_id = string
+      container_name     = string
+      name               = string
+    })), [])
+    storage_blob_direct = optional(list(object({
+      storage_account_id = string
+      container_name     = string
+      name               = string
+    })), [])
+    storage_table_direct = optional(list(object({
+      storage_account_id = string
+      table_name         = string
+      name               = string
+    })), [])
+  })
+```
 
 ### <a name="input_location"></a> [location](#input\_location)
 
@@ -97,6 +187,147 @@ object({
 
 Default: `null`
 
+### <a name="input_data_collection_endpoint_id"></a> [data\_collection\_endpoint\_id](#input\_data\_collection\_endpoint\_id)
+
+Description: (Optional) The resource ID of the Data Collection Endpoint that this rule can be used with.
+
+Type: `string`
+
+Default: `null`
+
+### <a name="input_data_sources"></a> [data\_sources](#input\_data\_sources)
+
+Description: The data sources configuration block. This is optional and can be omitted if the rule is meant to be used via direct calls to the provisioned endpoint.
+- `data_import` - (Optional) Data import configuration for Event Hub data sources
+  - `event_hub_data_source` - (Required) Configuration for Event Hub data source
+    - `name` - (Required) The name of the Event Hub data source
+    - `stream` - (Required) The stream name to use for the data source
+    - `consumer_group` - (Optional) The consumer group to use for the Event Hub
+- `extension` - (Optional) List of VM extension data sources
+  - `extension_name` - (Required) The name of the VM extension
+  - `name` - (Required) The name of the data source
+  - `streams` - (Required) List of streams to send data to
+  - `extension_json` - (Optional) JSON configuration for the extension
+  - `input_data_sources` - (Optional) List of input data sources
+- `iis_log` - (Optional) List of IIS log data sources
+  - `name` - (Required) The name of the data source
+  - `streams` - (Required) List of streams to send data to
+  - `log_directories` - (Optional) List of log directories to monitor
+- `log_file` - (Optional) List of log file data sources
+  - `name` - (Required) The name of the data source
+  - `streams` - (Required) List of streams to send data to
+  - `file_patterns` - (Required) List of file patterns to match
+  - `format` - (Required) The format of the log file (e.g., "text")
+  - `settings` - (Optional) Additional settings for the log file
+    - `text` - (Required) Text format settings
+      - `record_start_timestamp_format` - (Required) Timestamp format for record start
+- `performance_counter` - (Optional) List of performance counter data sources
+  - `counter_specifiers` - (Required) List of performance counter specifiers
+  - `name` - (Required) The name of the data source
+  - `sampling_frequency_in_seconds` - (Required) Sampling frequency in seconds
+  - `streams` - (Required) List of streams to send data to
+- `platform_telemetry` - (Optional) List of platform telemetry data sources
+  - `name` - (Required) The name of the data source
+  - `streams` - (Required) List of streams to send data to
+- `prometheus_forwarder` - (Optional) List of Prometheus forwarder data sources
+  - `name` - (Required) The name of the data source
+  - `streams` - (Required) List of streams to send data to
+  - `label_include_filter` - (Optional) List of label filters to include
+    - `label` - (Required) The label name to filter on
+    - `value` - (Required) The label value to filter on
+- `syslog` - (Optional) List of syslog data sources
+  - `facility_names` - (Required) List of syslog facility names
+  - `streams` - (Required) List of streams to send data to
+  - `log_levels` - (Required) List of log levels to capture
+  - `name` - (Required) The name of the data source
+- `windows_event_log` - (Optional) List of Windows event log data sources
+  - `name` - (Required) The name of the data source
+  - `streams` - (Required) List of streams to send data to
+  - `x_path_queries` - (Required) List of XPath queries to filter events
+- `windows_firewall_log` - (Optional) List of Windows firewall log data sources
+  - `name` - (Required) The name of the data source
+  - `streams` - (Required) List of streams to send data to
+
+Type:
+
+```hcl
+object({
+    data_import = optional(object({
+      event_hub_data_source = object({
+        name           = string
+        stream         = string
+        consumer_group = optional(string, null)
+      })
+    }), null)
+    extension = optional(list(object({
+      extension_name     = string
+      name               = string
+      streams            = list(string)
+      extension_json     = optional(string, null)
+      input_data_sources = optional(list(string), [])
+    })), [])
+    iis_log = optional(list(object({
+      name            = string
+      streams         = list(string)
+      log_directories = optional(list(string), [])
+    })), [])
+    log_file = optional(list(object({
+      name          = string
+      streams       = list(string)
+      file_patterns = list(string)
+      format        = string
+      settings = optional(object({
+        text = object({
+          record_start_timestamp_format = string
+        })
+      }), null)
+    })), [])
+    performance_counter = optional(list(object({
+      counter_specifiers            = list(string)
+      name                          = string
+      sampling_frequency_in_seconds = number
+      streams                       = list(string)
+    })), [])
+    platform_telemetry = optional(list(object({
+      name    = string
+      streams = list(string)
+    })), [])
+    prometheus_forwarder = optional(list(object({
+      name    = string
+      streams = list(string)
+      label_include_filter = optional(list(object({
+        label = string
+        value = string
+      })), [])
+    })), [])
+    syslog = optional(list(object({
+      facility_names = list(string)
+      streams        = list(string)
+      log_levels     = list(string)
+      name           = string
+    })), [])
+    windows_event_log = optional(list(object({
+      name           = string
+      streams        = list(string)
+      x_path_queries = list(string)
+    })), [])
+    windows_firewall_log = optional(list(object({
+      name    = string
+      streams = list(string)
+    })), [])
+  })
+```
+
+Default: `{}`
+
+### <a name="input_description"></a> [description](#input\_description)
+
+Description: (Optional) The description of the Data Collection Rule.
+
+Type: `string`
+
+Default: `null`
+
 ### <a name="input_diagnostic_settings"></a> [diagnostic\_settings](#input\_diagnostic\_settings)
 
 Description: A map of diagnostic settings to create on the Key Vault. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
@@ -141,6 +372,14 @@ Type: `bool`
 
 Default: `true`
 
+### <a name="input_kind"></a> [kind](#input\_kind)
+
+Description: (Optional) The kind of the Data Collection Rule. Possible values are Linux, Windows, AgentDirectToStore and WorkspaceTransforms. A rule of kind Linux does not allow for windows\_event\_log data sources. And a rule of kind Windows does not allow for syslog data sources. If kind is not specified, all kinds of data sources are allowed. Note: Once kind has been set, changing it forces a new Data Collection Rule to be created.
+
+Type: `string`
+
+Default: `null`
+
 ### <a name="input_lock"></a> [lock](#input\_lock)
 
 Description: Controls the Resource Lock configuration for this resource. The following properties can be specified:
@@ -166,6 +405,8 @@ Description: Controls the Managed Identity configuration on this resource. The f
 - `system_assigned` - (Optional) Specifies if the System Assigned Managed Identity should be enabled.
 - `user_assigned_resource_ids` - (Optional) Specifies a list of User Assigned Managed Identity resource IDs to be assigned to this resource.
 
+Note: `system_assigned` and `user_assigned_resource_ids` cannot be used together. Only one type of managed identity is allowed.
+
 Type:
 
 ```hcl
@@ -176,70 +417,6 @@ object({
 ```
 
 Default: `{}`
-
-### <a name="input_private_endpoints"></a> [private\_endpoints](#input\_private\_endpoints)
-
-Description: A map of private endpoints to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-
-- `name` - (Optional) The name of the private endpoint. One will be generated if not set.
-- `role_assignments` - (Optional) A map of role assignments to create on the private endpoint. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time. See `var.role_assignments` for more information.
-- `lock` - (Optional) The lock level to apply to the private endpoint. Default is `None`. Possible values are `None`, `CanNotDelete`, and `ReadOnly`.
-- `tags` - (Optional) A mapping of tags to assign to the private endpoint.
-- `subnet_resource_id` - The resource ID of the subnet to deploy the private endpoint in.
-- `private_dns_zone_group_name` - (Optional) The name of the private DNS zone group. One will be generated if not set.
-- `private_dns_zone_resource_ids` - (Optional) A set of resource IDs of private DNS zones to associate with the private endpoint. If not set, no zone groups will be created and the private endpoint will not be associated with any private DNS zones. DNS records must be managed external to this module.
-- `application_security_group_resource_ids` - (Optional) A map of resource IDs of application security groups to associate with the private endpoint. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-- `private_service_connection_name` - (Optional) The name of the private service connection. One will be generated if not set.
-- `network_interface_name` - (Optional) The name of the network interface. One will be generated if not set.
-- `location` - (Optional) The Azure location where the resources will be deployed. Defaults to the location of the resource group.
-- `resource_group_name` - (Optional) The resource group where the resources will be deployed. Defaults to the resource group of this resource.
-- `ip_configurations` - (Optional) A map of IP configurations to create on the private endpoint. If not specified the platform will create one. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-  - `name` - The name of the IP configuration.
-  - `private_ip_address` - The private IP address of the IP configuration.
-
-Type:
-
-```hcl
-map(object({
-    name = optional(string, null)
-    role_assignments = optional(map(object({
-      role_definition_id_or_name             = string
-      principal_id                           = string
-      description                            = optional(string, null)
-      skip_service_principal_aad_check       = optional(bool, false)
-      condition                              = optional(string, null)
-      condition_version                      = optional(string, null)
-      delegated_managed_identity_resource_id = optional(string, null)
-    })), {})
-    lock = optional(object({
-      kind = string
-      name = optional(string, null)
-    }), null)
-    tags                                    = optional(map(string), null)
-    subnet_resource_id                      = string
-    private_dns_zone_group_name             = optional(string, "default")
-    private_dns_zone_resource_ids           = optional(set(string), [])
-    application_security_group_associations = optional(map(string), {})
-    private_service_connection_name         = optional(string, null)
-    network_interface_name                  = optional(string, null)
-    location                                = optional(string, null)
-    resource_group_name                     = optional(string, null)
-    ip_configurations = optional(map(object({
-      name               = string
-      private_ip_address = string
-    })), {})
-  }))
-```
-
-Default: `{}`
-
-### <a name="input_private_endpoints_manage_dns_zone_group"></a> [private\_endpoints\_manage\_dns\_zone\_group](#input\_private\_endpoints\_manage\_dns\_zone\_group)
-
-Description: Whether to manage private DNS zone groups with this module. If set to false, you must manage private DNS zone groups externally, e.g. using Azure Policy.
-
-Type: `bool`
-
-Default: `true`
 
 ### <a name="input_role_assignments"></a> [role\_assignments](#input\_role\_assignments)
 
@@ -270,6 +447,26 @@ map(object({
 
 Default: `{}`
 
+### <a name="input_stream_declarations"></a> [stream\_declarations](#input\_stream\_declarations)
+
+Description: A list of stream declarations for custom streams. Each stream declaration must have a unique stream\_name that begins with 'Custom-'.
+- `stream_name` - (Required) The name of the custom stream, must begin with 'Custom-'
+- `columns` - (Required) List of column definitions with name and type (string, int, long, real, boolean, datetime, dynamic)
+
+Type:
+
+```hcl
+list(object({
+    stream_name = string
+    columns = list(object({
+      name = string
+      type = string
+    }))
+  }))
+```
+
+Default: `[]`
+
 ### <a name="input_tags"></a> [tags](#input\_tags)
 
 Description: (Optional) Tags of the resource.
@@ -282,13 +479,33 @@ Default: `null`
 
 The following outputs are exported:
 
-### <a name="output_private_endpoints"></a> [private\_endpoints](#output\_private\_endpoints)
+### <a name="output_immutable_id"></a> [immutable\_id](#output\_immutable\_id)
 
-Description:   A map of the private endpoints created.
+Description: The immutable ID of the Data Collection Rule.
+
+### <a name="output_location"></a> [location](#output\_location)
+
+Description: The location of the Data Collection Rule.
+
+### <a name="output_name"></a> [name](#output\_name)
+
+Description: The name of the Data Collection Rule.
 
 ### <a name="output_resource"></a> [resource](#output\_resource)
 
 Description: This is the full output for the resource.
+
+### <a name="output_resource_group_name"></a> [resource\_group\_name](#output\_resource\_group\_name)
+
+Description: The resource group name of the Data Collection Rule.
+
+### <a name="output_resource_id"></a> [resource\_id](#output\_resource\_id)
+
+Description: The ID of the Data Collection Rule.
+
+### <a name="output_system_assigned_mi_principal_id"></a> [system\_assigned\_mi\_principal\_id](#output\_system\_assigned\_mi\_principal\_id)
+
+Description: The principal id of the system managed identity assigned to the virtual machine
 
 ## Modules
 

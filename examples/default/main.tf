@@ -51,10 +51,12 @@ resource "azurerm_resource_group" "this" {
 module "test" {
   source = "../../"
 
-  location            = azurerm_resource_group.this.location
-  name                = "dcr-test"
-  resource_group_name = azurerm_resource_group.this.name
-
+  data_flows = [
+    {
+      destinations = ["azureMonitorMetrics-default"]
+      streams      = ["Microsoft-InsightsMetrics"]
+    }
+  ]
   destinations = {
     azure_monitor_metrics = {
       this = {
@@ -62,7 +64,9 @@ module "test" {
       }
     }
   }
-
+  location            = azurerm_resource_group.this.location
+  name                = "dcr-test"
+  resource_group_name = azurerm_resource_group.this.name
   data_sources = {
     performance_counter = [
       {
@@ -77,11 +81,4 @@ module "test" {
       }
     ]
   }
-
-  data_flows = [
-    {
-      destinations = ["azureMonitorMetrics-default"]
-      streams      = ["Microsoft-InsightsMetrics"]
-    }
-  ]
 }

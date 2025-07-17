@@ -1,45 +1,19 @@
-variable "location" {
-  type        = string
-  description = "Azure region where the resource should be deployed."
-  nullable    = false
-}
-
-variable "name" {
-  type        = string
-  description = "The name of the this resource."
-
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9_-]{1,64}$", var.name))
-    error_message = "The name must contain between 1 to 64 characters inclusive. The name only allows alphanumeric characters, underscores, hyphens and cannot start or end in a space."
-  }
-}
-
-variable "kind" {
-  type        = string
-  default     = null
-  description = "(Optional) The kind of the Data Collection Rule. Possible values are Linux, Windows, AgentDirectToStore and WorkspaceTransforms. A rule of kind Linux does not allow for windows_event_log data sources. And a rule of kind Windows does not allow for syslog data sources. If kind is not specified, all kinds of data sources are allowed. Note: Once kind has been set, changing it forces a new Data Collection Rule to be created."
-
-  validation {
-    condition     = var.kind == null ? true : contains(["Linux", "Windows", "AgentDirectToStore", "WorkspaceTransforms"], var.kind)
-    error_message = "The kind must be one of: 'Linux', 'Windows', 'AgentDirectToStore', or 'WorkspaceTransforms'."
-  }
-}
-
-variable "resource_group_name" {
-  type        = string
-  description = "The resource group where the resources will be deployed."
-}
-
-variable "description" {
-  type        = string
-  default     = null
-  description = "(Optional) The description of the Data Collection Rule."
-}
-
-variable "data_collection_endpoint_id" {
-  type        = string
-  default     = null
-  description = "(Optional) The resource ID of the Data Collection Endpoint that this rule can be used with."
+variable "data_flows" {
+  type = list(object({
+    streams            = list(string)
+    destinations       = list(string)
+    built_in_transform = optional(string, null)
+    output_stream      = optional(string, null)
+    transform_kql      = optional(string, null)
+  }))
+  description = <<DESCRIPTION
+A list of data flow configurations that define how data moves from sources to destinations.
+- `streams` - (Required) A list of streams to be sent to the destinations
+- `destinations` - (Required) A list of destination names where the data will be sent
+- `built_in_transform` - (Optional) The built-in transform to transform stream data
+- `output_stream` - (Optional) The output stream of the transform. Only required if the data flow changes data to a different stream
+- `transform_kql` - (Optional) The KQL query to transform stream data
+DESCRIPTION
 }
 
 variable "destinations" {
@@ -124,22 +98,54 @@ DESCRIPTION
   }
 }
 
-variable "data_flows" {
-  type = list(object({
-    streams           = list(string)
-    destinations      = list(string)
-    built_in_transform = optional(string, null)
-    output_stream     = optional(string, null)
-    transform_kql     = optional(string, null)
-  }))
+variable "location" {
+  type        = string
+  description = "Azure region where the resource should be deployed."
+  nullable    = false
+}
+
+variable "name" {
+  type        = string
+  description = "The name of the this resource."
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9_-]{1,64}$", var.name))
+    error_message = "The name must contain between 1 to 64 characters inclusive. The name only allows alphanumeric characters, underscores, hyphens and cannot start or end in a space."
+  }
+}
+
+variable "resource_group_name" {
+  type        = string
+  description = "The resource group where the resources will be deployed."
+}
+
+# required AVM interfaces
+# remove only if not supported by the resource
+# tflint-ignore: terraform_unused_declarations
+variable "customer_managed_key" {
+  type = object({
+    key_vault_resource_id = string
+    key_name              = string
+    key_version           = optional(string, null)
+    user_assigned_identity = optional(object({
+      resource_id = string
+    }), null)
+  })
+  default     = null
   description = <<DESCRIPTION
-A list of data flow configurations that define how data moves from sources to destinations.
-- `streams` - (Required) A list of streams to be sent to the destinations
-- `destinations` - (Required) A list of destination names where the data will be sent
-- `built_in_transform` - (Optional) The built-in transform to transform stream data
-- `output_stream` - (Optional) The output stream of the transform. Only required if the data flow changes data to a different stream
-- `transform_kql` - (Optional) The KQL query to transform stream data
-DESCRIPTION
+A map describing customer-managed keys to associate with the resource. This includes the following properties:
+- `key_vault_resource_id` - The resource ID of the Key Vault where the key is stored.
+- `key_name` - The name of the key.
+- `key_version` - (Optional) The version of the key. If not specified, the latest version is used.
+- `user_assigned_identity` - (Optional) An object representing a user-assigned identity with the following properties:
+  - `resource_id` - The resource ID of the user-assigned identity.
+DESCRIPTION  
+}
+
+variable "data_collection_endpoint_id" {
+  type        = string
+  default     = null
+  description = "(Optional) The resource ID of the Data Collection Endpoint that this rule can be used with."
 }
 
 variable "data_sources" {
@@ -152,11 +158,11 @@ variable "data_sources" {
       })
     }), null)
     extension = optional(list(object({
-      extension_name      = string
-      name                = string
-      streams             = list(string)
-      extension_json      = optional(string, null)
-      input_data_sources  = optional(list(string), [])
+      extension_name     = string
+      name               = string
+      streams            = list(string)
+      extension_json     = optional(string, null)
+      input_data_sources = optional(list(string), [])
     })), [])
     iis_log = optional(list(object({
       name            = string
@@ -263,62 +269,10 @@ The data sources configuration block. This is optional and can be omitted if the
 DESCRIPTION
 }
 
-variable "stream_declarations" {
-  type = list(object({
-    stream_name = string
-    columns = list(object({
-      name = string
-      type = string
-    }))
-  }))
-  default     = []
-  description = <<DESCRIPTION
-A list of stream declarations for custom streams. Each stream declaration must have a unique stream_name that begins with 'Custom-'.
-- `stream_name` - (Required) The name of the custom stream, must begin with 'Custom-'
-- `columns` - (Required) List of column definitions with name and type (string, int, long, real, boolean, datetime, dynamic)
-DESCRIPTION
-
-  validation {
-    condition = alltrue([
-      for stream in var.stream_declarations : 
-      can(regex("^Custom-", stream.stream_name))
-    ])
-    error_message = "All stream names must begin with 'Custom-'."
-  }
-
-  validation {
-    condition = alltrue([
-      for stream in var.stream_declarations : 
-      alltrue([
-        for column in stream.columns :
-        contains(["string", "int", "long", "real", "boolean", "datetime", "dynamic"], column.type)
-      ])
-    ])
-    error_message = "Column types must be one of: string, int, long, real, boolean, datetime, dynamic."
-  }
-}
-
-# required AVM interfaces
-# remove only if not supported by the resource
-# tflint-ignore: terraform_unused_declarations
-variable "customer_managed_key" {
-  type = object({
-    key_vault_resource_id = string
-    key_name              = string
-    key_version           = optional(string, null)
-    user_assigned_identity = optional(object({
-      resource_id = string
-    }), null)
-  })
+variable "description" {
+  type        = string
   default     = null
-  description = <<DESCRIPTION
-A map describing customer-managed keys to associate with the resource. This includes the following properties:
-- `key_vault_resource_id` - The resource ID of the Key Vault where the key is stored.
-- `key_name` - The name of the key.
-- `key_version` - (Optional) The version of the key. If not specified, the latest version is used.
-- `user_assigned_identity` - (Optional) An object representing a user-assigned identity with the following properties:
-  - `resource_id` - The resource ID of the user-assigned identity.
-DESCRIPTION  
+  description = "(Optional) The description of the Data Collection Rule."
 }
 
 variable "diagnostic_settings" {
@@ -375,6 +329,17 @@ For more information see <https://aka.ms/avm/telemetryinfo>.
 If it is set to false, then no telemetry will be collected.
 DESCRIPTION
   nullable    = false
+}
+
+variable "kind" {
+  type        = string
+  default     = null
+  description = "(Optional) The kind of the Data Collection Rule. Possible values are Linux, Windows, AgentDirectToStore and WorkspaceTransforms. A rule of kind Linux does not allow for windows_event_log data sources. And a rule of kind Windows does not allow for syslog data sources. If kind is not specified, all kinds of data sources are allowed. Note: Once kind has been set, changing it forces a new Data Collection Rule to be created."
+
+  validation {
+    condition     = var.kind == null ? true : contains(["Linux", "Windows", "AgentDirectToStore", "WorkspaceTransforms"], var.kind)
+    error_message = "The kind must be one of: 'Linux', 'Windows', 'AgentDirectToStore', or 'WorkspaceTransforms'."
+  }
 }
 
 variable "lock" {
@@ -443,6 +408,40 @@ A map of role assignments to create on this resource. The map key is deliberatel
 > Note: only set `skip_service_principal_aad_check` to true if you are assigning a role to a service principal.
 DESCRIPTION
   nullable    = false
+}
+
+variable "stream_declarations" {
+  type = list(object({
+    stream_name = string
+    columns = list(object({
+      name = string
+      type = string
+    }))
+  }))
+  default     = []
+  description = <<DESCRIPTION
+A list of stream declarations for custom streams. Each stream declaration must have a unique stream_name that begins with 'Custom-'.
+- `stream_name` - (Required) The name of the custom stream, must begin with 'Custom-'
+- `columns` - (Required) List of column definitions with name and type (string, int, long, real, boolean, datetime, dynamic)
+DESCRIPTION
+
+  validation {
+    condition = alltrue([
+      for stream in var.stream_declarations :
+      can(regex("^Custom-", stream.stream_name))
+    ])
+    error_message = "All stream names must begin with 'Custom-'."
+  }
+  validation {
+    condition = alltrue([
+      for stream in var.stream_declarations :
+      alltrue([
+        for column in stream.columns :
+        contains(["string", "int", "long", "real", "boolean", "datetime", "dynamic"], column.type)
+      ])
+    ])
+    error_message = "Column types must be one of: string, int, long, real, boolean, datetime, dynamic."
+  }
 }
 
 # tflint-ignore: terraform_unused_declarations

@@ -54,19 +54,39 @@ resource "azurerm_resource_group" "this" {
   name     = module.naming.resource_group.name_unique
 }
 
-# This is the module call
-# Do not specify location here due to the randomization above.
-# Leaving location as `null` will cause the module to use the resource group location
-# with a data source.
 module "test" {
   source = "../../"
 
-  # source             = "Azure/avm-<res/ptn>-<name>/azurerm"
-  # ...
+  data_flows = [
+    {
+      destinations = ["azureMonitorMetrics-default"]
+      streams      = ["Microsoft-InsightsMetrics"]
+    }
+  ]
+  destinations = {
+    azure_monitor_metrics = {
+      this = {
+        name = "azureMonitorMetrics-default"
+      }
+    }
+  }
   location            = azurerm_resource_group.this.location
-  name                = "TODO" # TODO update with module.naming.<RESOURCE_TYPE>.name_unique
+  name                = "dcr-test"
   resource_group_name = azurerm_resource_group.this.name
-  enable_telemetry    = var.enable_telemetry # see variables.tf
+  data_sources = {
+    performance_counter = [
+      {
+        name                          = "perfCounterDataSource60"
+        sampling_frequency_in_seconds = 60
+        counter_specifiers = [
+          "\\System\\System Up Time"
+        ]
+        streams = [
+          "Microsoft-InsightsMetrics"
+        ]
+      }
+    ]
+  }
 }
 ```
 
@@ -97,17 +117,7 @@ No required inputs.
 
 ## Optional Inputs
 
-The following input variables are optional (have default values):
-
-### <a name="input_enable_telemetry"></a> [enable\_telemetry](#input\_enable\_telemetry)
-
-Description: This variable controls whether or not telemetry is enabled for the module.  
-For more information see <https://aka.ms/avm/telemetryinfo>.  
-If it is set to false, then no telemetry will be collected.
-
-Type: `bool`
-
-Default: `true`
+No optional inputs.
 
 ## Outputs
 
