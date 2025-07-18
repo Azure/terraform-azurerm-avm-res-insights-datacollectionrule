@@ -1,13 +1,36 @@
-output "private_endpoints" {
-  description = <<DESCRIPTION
-  A map of the private endpoints created.
-  DESCRIPTION
-  value       = var.private_endpoints_manage_dns_zone_group ? azurerm_private_endpoint.this_managed_dns_zone_groups : azurerm_private_endpoint.this_unmanaged_dns_zone_groups
+output "immutable_id" {
+  description = "The immutable ID of the Data Collection Rule."
+  value       = azurerm_monitor_data_collection_rule.this.immutable_id
+}
+
+output "location" {
+  description = "The location of the Data Collection Rule."
+  value       = azurerm_monitor_data_collection_rule.this.location
+}
+
+output "name" {
+  description = "The name of the Data Collection Rule."
+  value       = azurerm_monitor_data_collection_rule.this.name
 }
 
 # Module owners should include the full resource via a 'resource' output
 # https://azure.github.io/Azure-Verified-Modules/specs/terraform/#id-tffr2---category-outputs---additional-terraform-outputs
 output "resource" {
   description = "This is the full output for the resource."
-  value       = azurerm_resource_group.TODO # TODO: Replace this dummy resource azurerm_resource_group.TODO with your module resource
+  value       = azurerm_monitor_data_collection_rule.this
+}
+
+output "resource_group_name" {
+  description = "The resource group name of the Data Collection Rule."
+  value       = azurerm_monitor_data_collection_rule.this.resource_group_name
+}
+
+output "resource_id" {
+  description = "The ID of the Data Collection Rule."
+  value       = azurerm_monitor_data_collection_rule.this.id
+}
+
+output "system_assigned_mi_principal_id" {
+  description = "The principal id of the system managed identity assigned to the virtual machine"
+  value       = var.managed_identities.system_assigned == true ? azurerm_monitor_data_collection_rule.this.identity[0].principal_id : null
 }

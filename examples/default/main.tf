@@ -1,18 +1,14 @@
 terraform {
-  required_version = "~> 1.5"
+  required_version = ">= 1.9, < 2.0"
 
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.74"
-    }
-    modtm = {
-      source  = "azure/modtm"
-      version = "~> 0.3"
+      version = "~> 4.0, < 5.0"
     }
     random = {
       source  = "hashicorp/random"
-      version = "~> 3.5"
+      version = "~> 3.7"
     }
   }
 }
@@ -26,7 +22,7 @@ provider "azurerm" {
 # This allows us to randomize the region for the resource group.
 module "regions" {
   source  = "Azure/regions/azurerm"
-  version = "~> 0.3"
+  version = "0.5.0"
 }
 
 # This allows us to randomize the region for the resource group.
@@ -39,7 +35,7 @@ resource "random_integer" "region_index" {
 # This ensures we have unique CAF compliant names for our resources.
 module "naming" {
   source  = "Azure/naming/azurerm"
-  version = "~> 0.3"
+  version = "0.4.2"
 }
 
 # This is required for resource modules
@@ -48,17 +44,37 @@ resource "azurerm_resource_group" "this" {
   name     = module.naming.resource_group.name_unique
 }
 
-# This is the module call
-# Do not specify location here due to the randomization above.
-# Leaving location as `null` will cause the module to use the resource group location
-# with a data source.
 module "test" {
   source = "../../"
 
-  # source             = "Azure/avm-<res/ptn>-<name>/azurerm"
-  # ...
+  data_flows = [
+    {
+      destinations = ["azureMonitorMetrics-default"]
+      streams      = ["Microsoft-InsightsMetrics"]
+    }
+  ]
+  destinations = {
+    azure_monitor_metrics = [
+      {
+        name = "azureMonitorMetrics-default"
+      }
+    ]
+  }
   location            = azurerm_resource_group.this.location
-  name                = "TODO" # TODO update with module.naming.<RESOURCE_TYPE>.name_unique
+  name                = "dcr-test"
   resource_group_name = azurerm_resource_group.this.name
-  enable_telemetry    = var.enable_telemetry # see variables.tf
+  data_sources = {
+    performance_counter = [
+      {
+        name                          = "perfCounterDataSource60"
+        sampling_frequency_in_seconds = 60
+        counter_specifiers = [
+          "\\System\\System Up Time"
+        ]
+        streams = [
+          "Microsoft-InsightsMetrics"
+        ]
+      }
+    ]
+  }
 }
