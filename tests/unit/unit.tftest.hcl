@@ -16,8 +16,21 @@ mock_provider "azapi" {
     }
   }
 }
-mock_provider "modtm" {}
-mock_provider "random" {}
+mock_provider "modtm" {
+  mock_data "modtm_module_source" {
+    defaults = {
+      module_source  = "registry.terraform.io/Azure/avm-res-insights-datacollectionrule/azurerm"
+      module_version = "0.1.0"
+    }
+  }
+}
+mock_provider "random" {
+  mock_resource "random_uuid" {
+    defaults = {
+      result = "00000000-0000-0000-0000-000000000000"
+    }
+  }
+}
 
 variables {
   location                   = "eastus"
