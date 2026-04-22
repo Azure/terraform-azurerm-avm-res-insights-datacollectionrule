@@ -1,3 +1,7 @@
+# --- DCR-specific variables ---
+
+# --- AVM interface variables ---
+
 variable "location" {
   type        = string
   description = "Azure region where the resource should be deployed."
@@ -16,7 +20,28 @@ variable "resource_group_resource_id" {
   nullable    = false
 }
 
-# --- DCR-specific variables ---
+variable "agent_settings" {
+  type = object({
+    logs = optional(list(object({
+      name  = string
+      value = string
+    })), [])
+  })
+  default     = null
+  description = <<DESCRIPTION
+Agent settings used to modify agent behavior on a given host.
+
+- `logs` - (Optional) All the settings that are applicable to the logs agent (AMA).
+  - `name` - (Required) The name of the setting. Supported values: `MaxDiskQuotaInMB`, `UseTimeReceivedForForwardedEvents`.
+  - `value` - (Required) The value of the setting.
+DESCRIPTION
+}
+
+variable "data_collection_endpoint_id" {
+  type        = string
+  default     = null
+  description = "The resource ID of the data collection endpoint that this rule can be used with."
+}
 
 variable "data_flows" {
   type = list(object({
@@ -57,6 +82,15 @@ variable "data_sources" {
       name               = string
       streams            = list(string)
     })), [])
+    etw_providers = optional(list(object({
+      event_ids     = optional(list(string), null)
+      keyword       = optional(string, null)
+      log_level     = optional(string, null)
+      name          = string
+      provider      = string
+      provider_type = string
+      streams       = list(string)
+    })), [])
     iis_logs = optional(list(object({
       log_directories = optional(list(string), null)
       name            = string
@@ -75,6 +109,38 @@ variable "data_sources" {
       streams       = list(string)
       transform_kql = optional(string, null)
     })), [])
+    otel_logs = optional(list(object({
+      enrich_with_reference              = optional(string, null)
+      enrich_with_resource_attributes    = optional(list(string), null)
+      name                               = string
+      replace_resource_id_with_reference = optional(bool, null)
+      resource_attribute_routing = optional(object({
+        attribute_name  = optional(string, null)
+        attribute_value = optional(string, null)
+      }), null)
+      streams = list(string)
+    })), [])
+    otel_metrics = optional(list(object({
+      enrich_with_reference           = optional(string, null)
+      enrich_with_resource_attributes = optional(list(string), null)
+      name                            = string
+      resource_attribute_routing = optional(object({
+        attribute_name  = optional(string, null)
+        attribute_value = optional(string, null)
+      }), null)
+      streams = list(string)
+    })), [])
+    otel_traces = optional(list(object({
+      enrich_with_reference              = optional(string, null)
+      enrich_with_resource_attributes    = optional(list(string), null)
+      name                               = string
+      replace_resource_id_with_reference = optional(bool, null)
+      resource_attribute_routing = optional(object({
+        attribute_name  = optional(string, null)
+        attribute_value = optional(string, null)
+      }), null)
+      streams = list(string)
+    })), [])
     performance_counters = optional(list(object({
       counter_specifiers            = list(string)
       name                          = string
@@ -82,14 +148,21 @@ variable "data_sources" {
       streams                       = list(string)
       transform_kql                 = optional(string, null)
     })), [])
+    performance_counters_otel = optional(list(object({
+      counter_specifiers            = list(string)
+      name                          = string
+      sampling_frequency_in_seconds = number
+      streams                       = list(string)
+    })), [])
     platform_telemetry = optional(list(object({
       name    = string
       streams = list(string)
     })), [])
     prometheus_forwarder = optional(list(object({
-      label_include_filter = optional(map(string), null)
-      name                 = string
-      streams              = list(string)
+      custom_vm_scrape_config = optional(list(any), null)
+      label_include_filter    = optional(map(string), null)
+      name                    = string
+      streams                 = list(string)
     })), [])
     syslog = optional(list(object({
       facility_names = list(string)
@@ -117,15 +190,26 @@ The specification of data sources for the data collection rule. This property is
 - `data_imports` - (Optional) Specifications of pull based data sources.
   - `event_hub` - (Optional) Event Hub data import configuration.
 - `extensions` - (Optional) The list of Azure VM extension data source configurations.
+- `etw_providers` - (Optional) The list of ETW provider data source configurations.
 - `iis_logs` - (Optional) The list of IIS logs source configurations.
 - `log_files` - (Optional) The list of log files source configurations.
+- `otel_logs` - (Optional) The list of OpenTelemetry logs data source configurations.
+- `otel_metrics` - (Optional) The list of OpenTelemetry metrics data source configurations.
+- `otel_traces` - (Optional) The list of OpenTelemetry traces data source configurations.
 - `performance_counters` - (Optional) The list of performance counter data source configurations.
+- `performance_counters_otel` - (Optional) The list of OpenTelemetry performance counter data source configurations.
 - `platform_telemetry` - (Optional) The list of platform telemetry configurations.
 - `prometheus_forwarder` - (Optional) The list of Prometheus forwarder data source configurations.
 - `syslog` - (Optional) The list of Syslog data source configurations.
 - `windows_event_logs` - (Optional) The list of Windows Event Log data source configurations.
 - `windows_firewall_logs` - (Optional) The list of Windows Firewall logs source configurations.
 DESCRIPTION
+}
+
+variable "description" {
+  type        = string
+  default     = null
+  description = "A description of the data collection rule."
 }
 
 variable "destinations" {
@@ -194,88 +278,6 @@ The specification of destinations for the data collection rule.
 DESCRIPTION
 }
 
-variable "stream_declarations" {
-  type = map(object({
-    columns = list(object({
-      name = string
-      type = string
-    }))
-  }))
-  default     = {}
-  description = <<DESCRIPTION
-Declaration of custom streams used in this rule. The map key is the stream name (e.g., "Custom-MyStream").
-
-- `columns` - (Required) List of column definitions for the custom stream.
-  - `name` - (Required) The name of the column.
-  - `type` - (Required) The type of the column data. Possible values are `boolean`, `datetime`, `dynamic`, `int`, `long`, `real`, `string`.
-DESCRIPTION
-  nullable    = false
-}
-
-variable "agent_settings" {
-  type = object({
-    logs = optional(list(object({
-      name  = string
-      value = string
-    })), [])
-  })
-  default     = null
-  description = <<DESCRIPTION
-Agent settings used to modify agent behavior on a given host.
-
-- `logs` - (Optional) All the settings that are applicable to the logs agent (AMA).
-  - `name` - (Required) The name of the setting. Supported values: `MaxDiskQuotaInMB`, `UseTimeReceivedForForwardedEvents`.
-  - `value` - (Required) The value of the setting.
-DESCRIPTION
-}
-
-variable "data_collection_endpoint_id" {
-  type        = string
-  default     = null
-  description = "The resource ID of the data collection endpoint that this rule can be used with."
-}
-
-variable "description" {
-  type        = string
-  default     = null
-  description = "A description of the data collection rule."
-}
-
-variable "kind" {
-  type        = string
-  default     = null
-  description = "The kind of the data collection rule. Possible values are `Linux` and `Windows`."
-
-  validation {
-    condition     = var.kind == null || contains(["Linux", "Windows"], var.kind)
-    error_message = "The kind must be one of: 'Linux', 'Windows', or null."
-  }
-}
-
-variable "references" {
-  type = object({
-    enrichment_data = optional(object({
-      storage_blobs = optional(list(object({
-        blob_url    = string
-        lookup_type = string
-        name        = string
-        resource_id = string
-      })), [])
-    }), null)
-  })
-  default     = null
-  description = <<DESCRIPTION
-Defines all the references that may be used in other sections of the DCR.
-
-- `enrichment_data` - (Optional) All the enrichment data sources referenced in data flows.
-  - `storage_blobs` - (Optional) All the storage blobs used as enrichment data sources.
-    - `blob_url` - (Required) URL of the storage blob.
-    - `lookup_type` - (Required) The type of lookup to perform on the blob. Possible values: `Cidr`, `String`.
-    - `name` - (Required) The name of the enrichment data source used as an alias when referencing in data flows.
-    - `resource_id` - (Required) Resource ID of the storage account that hosts the blob.
-DESCRIPTION
-}
-
 variable "diagnostic_settings" {
   type = map(object({
     name                                     = optional(string, null)
@@ -321,7 +323,38 @@ DESCRIPTION
   }
 }
 
-# --- AVM interface variables ---
+variable "direct_data_sources" {
+  type = object({
+    otel_logs = optional(list(object({
+      enrich_with_reference              = optional(string, null)
+      enrich_with_resource_attributes    = optional(list(string), null)
+      name                               = string
+      replace_resource_id_with_reference = optional(bool, null)
+      streams                            = list(string)
+    })), [])
+    otel_metrics = optional(list(object({
+      enrich_with_reference           = optional(string, null)
+      enrich_with_resource_attributes = optional(list(string), null)
+      name                            = string
+      streams                         = list(string)
+    })), [])
+    otel_traces = optional(list(object({
+      enrich_with_reference              = optional(string, null)
+      enrich_with_resource_attributes    = optional(list(string), null)
+      name                               = string
+      replace_resource_id_with_reference = optional(bool, null)
+      streams                            = list(string)
+    })), [])
+  })
+  default     = null
+  description = <<DESCRIPTION
+The specification of direct data sources. This property is optional and can be omitted.
+
+- `otel_logs` - (Optional) The list of OpenTelemetry logs direct data source configurations.
+- `otel_metrics` - (Optional) The list of OpenTelemetry metrics direct data source configurations.
+- `otel_traces` - (Optional) The list of OpenTelemetry traces direct data source configurations.
+DESCRIPTION
+}
 
 variable "enable_telemetry" {
   type        = bool
@@ -332,6 +365,17 @@ For more information see <https://aka.ms/avm/telemetryinfo>.
 If it is set to false, then no telemetry will be collected.
 DESCRIPTION
   nullable    = false
+}
+
+variable "kind" {
+  type        = string
+  default     = null
+  description = "The kind of the data collection rule. Possible values are `Linux` and `Windows`."
+
+  validation {
+    condition     = var.kind == null || contains(["Linux", "Windows"], var.kind)
+    error_message = "The kind must be one of: 'Linux', 'Windows', or null."
+  }
 }
 
 variable "lock" {
@@ -368,6 +412,37 @@ DESCRIPTION
   nullable    = false
 }
 
+variable "references" {
+  type = object({
+    application_insights = optional(list(object({
+      name        = string
+      resource_id = string
+    })), [])
+    enrichment_data = optional(object({
+      storage_blobs = optional(list(object({
+        blob_url    = string
+        lookup_type = string
+        name        = string
+        resource_id = string
+      })), [])
+    }), null)
+  })
+  default     = null
+  description = <<DESCRIPTION
+Defines all the references that may be used in other sections of the DCR.
+
+- `application_insights` - (Optional) Application Insights references to be used on OTel metrics/logs enrichment.
+  - `name` - (Required) The name of the reference used as an alias when referencing this application insights in OTel data sources.
+  - `resource_id` - (Required) ID of the Application Insights resource.
+- `enrichment_data` - (Optional) All the enrichment data sources referenced in data flows.
+  - `storage_blobs` - (Optional) All the storage blobs used as enrichment data sources.
+    - `blob_url` - (Required) URL of the storage blob.
+    - `lookup_type` - (Required) The type of lookup to perform on the blob. Possible values: `Cidr`, `String`.
+    - `name` - (Required) The name of the enrichment data source used as an alias when referencing in data flows.
+    - `resource_id` - (Required) Resource ID of the storage account that hosts the blob.
+DESCRIPTION
+}
+
 variable "role_assignments" {
   type = map(object({
     role_definition_id_or_name             = string
@@ -393,6 +468,49 @@ A map of role assignments to create on this resource. The map key is deliberatel
 - `principal_type` - (Optional) The type of the `principal_id`. Possible values are `User`, `Group` and `ServicePrincipal`.
 
 > Note: only set `skip_service_principal_aad_check` to true if you are assigning a role to a service principal.
+DESCRIPTION
+  nullable    = false
+}
+
+variable "sku" {
+  type = object({
+    capacity = optional(number, null)
+    family   = optional(string, null)
+    name     = string
+    size     = optional(string, null)
+    tier     = optional(string, null)
+  })
+  default     = null
+  description = <<DESCRIPTION
+The SKU of the data collection rule resource.
+
+- `capacity` - (Optional) If the SKU supports scale out/in then the capacity integer should be included.
+- `family` - (Optional) If the service has different generations of hardware, for the same SKU, then that can be captured here.
+- `name` - (Required) The name of the SKU. E.g. P3. It is typically a letter+number code.
+- `size` - (Optional) The SKU size.
+- `tier` - (Optional) This field is required to be implemented by the Resource Provider if the service has more than one tier. Possible values: `Basic`, `Free`, `Premium`, `Standard`.
+DESCRIPTION
+
+  validation {
+    condition     = var.sku == null || var.sku.tier == null || contains(["Basic", "Free", "Premium", "Standard"], var.sku.tier)
+    error_message = "The SKU tier must be one of: 'Basic', 'Free', 'Premium', 'Standard', or null."
+  }
+}
+
+variable "stream_declarations" {
+  type = map(object({
+    columns = list(object({
+      name = string
+      type = string
+    }))
+  }))
+  default     = {}
+  description = <<DESCRIPTION
+Declaration of custom streams used in this rule. The map key is the stream name (e.g., "Custom-MyStream").
+
+- `columns` - (Required) List of column definitions for the custom stream.
+  - `name` - (Required) The name of the column.
+  - `type` - (Required) The type of the column data. Possible values are `boolean`, `datetime`, `dynamic`, `int`, `long`, `real`, `string`.
 DESCRIPTION
   nullable    = false
 }

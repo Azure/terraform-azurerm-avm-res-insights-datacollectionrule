@@ -1,17 +1,31 @@
 resource "azapi_resource" "this" {
-  type      = "Microsoft.Insights/dataCollectionRules@2023-03-11"
-  parent_id = var.resource_group_resource_id
-  name      = var.name
   location  = var.location
-  tags      = var.tags
-
+  name      = var.name
+  parent_id = var.resource_group_resource_id
+  type      = "Microsoft.Insights/dataCollectionRules@2024-03-11"
   body = {
     kind = var.kind
+    sku = var.sku != null ? {
+      capacity = var.sku.capacity
+      family   = var.sku.family
+      name     = var.sku.name
+      size     = var.sku.size
+      tier     = var.sku.tier
+    } : null
     properties = {
       for k, v in local.body_properties : k => v
       if v != null
     }
   }
+  create_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  delete_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  read_headers   = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  response_export_values = [
+    "properties.immutableId",
+    "properties.provisioningState",
+  ]
+  tags           = var.tags
+  update_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
 
   dynamic "identity" {
     for_each = local.identity != null ? [local.identity] : []
@@ -21,37 +35,33 @@ resource "azapi_resource" "this" {
       identity_ids = identity.value.userAssignedIdentities != null ? keys(identity.value.userAssignedIdentities) : []
     }
   }
-
-  response_export_values = [
-    "properties.immutableId",
-    "properties.provisioningState",
-  ]
 }
 
 resource "azapi_resource" "lock" {
   count = var.lock != null ? 1 : 0
 
-  type      = "Microsoft.Authorization/locks@2020-05-01"
-  parent_id = azapi_resource.this.id
   name      = coalesce(var.lock.name, "lock-${var.lock.kind}")
-
+  parent_id = azapi_resource.this.id
+  type      = "Microsoft.Authorization/locks@2020-05-01"
   body = {
     properties = {
       level = var.lock.kind
       notes = var.lock.kind == "CanNotDelete" ? "Cannot delete the resource or its child resources." : "Cannot delete or modify the resource or its child resources."
     }
   }
-
+  create_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  delete_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  read_headers           = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
   response_export_values = []
+  update_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
 }
 
 resource "azapi_resource" "role_assignment" {
   for_each = var.role_assignments
 
-  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
-  parent_id = azapi_resource.this.id
   name      = each.value.role_definition_id_or_name
-
+  parent_id = azapi_resource.this.id
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
   body = {
     properties = {
       principalId      = each.value.principal_id
@@ -62,17 +72,19 @@ resource "azapi_resource" "role_assignment" {
       conditionVersion = each.value.condition_version
     }
   }
-
+  create_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  delete_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  read_headers           = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
   response_export_values = []
+  update_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
 }
 
 resource "azapi_resource" "diagnostic_setting" {
   for_each = var.diagnostic_settings
 
-  type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
-  parent_id = azapi_resource.this.id
   name      = each.value.name != null ? each.value.name : "diag-${each.key}"
-
+  parent_id = azapi_resource.this.id
+  type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
   body = {
     properties = {
       workspaceId                 = each.value.workspace_resource_id
@@ -99,6 +111,9 @@ resource "azapi_resource" "diagnostic_setting" {
       }]
     }
   }
-
+  create_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  delete_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  read_headers           = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
   response_export_values = []
+  update_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
 }

@@ -6,7 +6,6 @@ locals {
       for id in var.managed_identities.user_assigned_resource_ids : id => {}
     } : null
   } : null
-
   # Role definition resource substring for distinguishing IDs from names
   role_definition_resource_substring = "/providers/Microsoft.Authorization/roleDefinitions"
 }
@@ -46,6 +45,18 @@ locals {
         } : null
       } : null
 
+      etwProviders = length(var.data_sources.etw_providers) > 0 ? [
+        for ep in var.data_sources.etw_providers : {
+          eventIds     = ep.event_ids
+          keyword      = ep.keyword
+          logLevel     = ep.log_level
+          name         = ep.name
+          provider     = ep.provider
+          providerType = ep.provider_type
+          streams      = ep.streams
+        }
+      ] : null
+
       extensions = length(var.data_sources.extensions) > 0 ? [
         for ext in var.data_sources.extensions : {
           extensionName     = ext.extension_name
@@ -80,6 +91,47 @@ locals {
         }
       ] : null
 
+      otelLogs = length(var.data_sources.otel_logs) > 0 ? [
+        for ol in var.data_sources.otel_logs : {
+          enrichWithReference            = ol.enrich_with_reference
+          enrichWithResourceAttributes   = ol.enrich_with_resource_attributes
+          name                           = ol.name
+          replaceResourceIdWithReference = ol.replace_resource_id_with_reference
+          resourceAttributeRouting = ol.resource_attribute_routing != null ? {
+            attributeName  = ol.resource_attribute_routing.attribute_name
+            attributeValue = ol.resource_attribute_routing.attribute_value
+          } : null
+          streams = ol.streams
+        }
+      ] : null
+
+      otelMetrics = length(var.data_sources.otel_metrics) > 0 ? [
+        for om in var.data_sources.otel_metrics : {
+          enrichWithReference          = om.enrich_with_reference
+          enrichWithResourceAttributes = om.enrich_with_resource_attributes
+          name                         = om.name
+          resourceAttributeRouting = om.resource_attribute_routing != null ? {
+            attributeName  = om.resource_attribute_routing.attribute_name
+            attributeValue = om.resource_attribute_routing.attribute_value
+          } : null
+          streams = om.streams
+        }
+      ] : null
+
+      otelTraces = length(var.data_sources.otel_traces) > 0 ? [
+        for ot in var.data_sources.otel_traces : {
+          enrichWithReference            = ot.enrich_with_reference
+          enrichWithResourceAttributes   = ot.enrich_with_resource_attributes
+          name                           = ot.name
+          replaceResourceIdWithReference = ot.replace_resource_id_with_reference
+          resourceAttributeRouting = ot.resource_attribute_routing != null ? {
+            attributeName  = ot.resource_attribute_routing.attribute_name
+            attributeValue = ot.resource_attribute_routing.attribute_value
+          } : null
+          streams = ot.streams
+        }
+      ] : null
+
       performanceCounters = length(var.data_sources.performance_counters) > 0 ? [
         for pc in var.data_sources.performance_counters : {
           counterSpecifiers          = pc.counter_specifiers
@@ -87,6 +139,15 @@ locals {
           samplingFrequencyInSeconds = pc.sampling_frequency_in_seconds
           streams                    = pc.streams
           transformKql               = pc.transform_kql
+        }
+      ] : null
+
+      performanceCountersOTel = length(var.data_sources.performance_counters_otel) > 0 ? [
+        for pco in var.data_sources.performance_counters_otel : {
+          counterSpecifiers          = pco.counter_specifiers
+          name                       = pco.name
+          samplingFrequencyInSeconds = pco.sampling_frequency_in_seconds
+          streams                    = pco.streams
         }
       ] : null
 
@@ -99,9 +160,10 @@ locals {
 
       prometheusForwarder = length(var.data_sources.prometheus_forwarder) > 0 ? [
         for pf in var.data_sources.prometheus_forwarder : {
-          labelIncludeFilter = pf.label_include_filter
-          name               = pf.name
-          streams            = pf.streams
+          customVMScrapeConfig = pf.custom_vm_scrape_config
+          labelIncludeFilter   = pf.label_include_filter
+          name                 = pf.name
+          streams              = pf.streams
         }
       ] : null
 
@@ -209,7 +271,45 @@ locals {
       ] : null
     } : null
 
+    directDataSources = var.direct_data_sources != null ? {
+      otelLogs = length(var.direct_data_sources.otel_logs) > 0 ? [
+        for ol in var.direct_data_sources.otel_logs : {
+          enrichWithReference            = ol.enrich_with_reference
+          enrichWithResourceAttributes   = ol.enrich_with_resource_attributes
+          name                           = ol.name
+          replaceResourceIdWithReference = ol.replace_resource_id_with_reference
+          streams                        = ol.streams
+        }
+      ] : null
+
+      otelMetrics = length(var.direct_data_sources.otel_metrics) > 0 ? [
+        for om in var.direct_data_sources.otel_metrics : {
+          enrichWithReference          = om.enrich_with_reference
+          enrichWithResourceAttributes = om.enrich_with_resource_attributes
+          name                         = om.name
+          streams                      = om.streams
+        }
+      ] : null
+
+      otelTraces = length(var.direct_data_sources.otel_traces) > 0 ? [
+        for ot in var.direct_data_sources.otel_traces : {
+          enrichWithReference            = ot.enrich_with_reference
+          enrichWithResourceAttributes   = ot.enrich_with_resource_attributes
+          name                           = ot.name
+          replaceResourceIdWithReference = ot.replace_resource_id_with_reference
+          streams                        = ot.streams
+        }
+      ] : null
+    } : null
+
     references = var.references != null ? {
+      applicationInsights = length(var.references.application_insights) > 0 ? [
+        for ai in var.references.application_insights : {
+          name       = ai.name
+          resourceId = ai.resource_id
+        }
+      ] : null
+
       enrichmentData = var.references.enrichment_data != null ? {
         storageBlobs = length(var.references.enrichment_data.storage_blobs) > 0 ? [
           for sb in var.references.enrichment_data.storage_blobs : {
