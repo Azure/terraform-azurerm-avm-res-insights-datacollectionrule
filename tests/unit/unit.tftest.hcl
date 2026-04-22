@@ -36,6 +36,7 @@ variables {
   location                   = "eastus"
   name                       = "test-dcr"
   resource_group_resource_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test"
+  enable_telemetry           = true
 
   data_flows = [
     {
