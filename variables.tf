@@ -6,43 +6,233 @@ variable "location" {
 
 variable "name" {
   type        = string
-  description = "The name of the this resource."
-
-  validation {
-    condition     = can(regex("TODO", var.name))
-    error_message = "The name must be TODO." # TODO remove the example below once complete:
-    #condition     = can(regex("^[a-z0-9]{5,50}$", var.name))
-    #error_message = "The name must be between 5 and 50 characters long and can only contain lowercase letters and numbers."
-  }
+  description = "The name of the data collection rule."
+  nullable    = false
 }
 
-# This is required for most resource modules
-variable "resource_group_name" {
+variable "resource_group_resource_id" {
   type        = string
-  description = "The resource group where the resources will be deployed."
+  description = "The resource ID of the resource group in which to create the data collection rule."
+  nullable    = false
 }
 
-# required AVM interfaces
-# remove only if not supported by the resource
-# tflint-ignore: terraform_unused_declarations
-variable "customer_managed_key" {
+# --- DCR-specific variables ---
+
+variable "data_flows" {
+  type = list(object({
+    built_in_transform = optional(string, null)
+    capture_overflow   = optional(bool, null)
+    destinations       = list(string)
+    output_stream      = optional(string, null)
+    streams            = list(string)
+    transform_kql      = optional(string, null)
+  }))
+  default     = []
+  description = <<DESCRIPTION
+The specification of data flows for the data collection rule.
+
+- `built_in_transform` - (Optional) The built-in transform to transform stream data.
+- `capture_overflow` - (Optional) Flag to enable overflow column in Log Analytics destinations.
+- `destinations` - (Required) List of destination names for this data flow.
+- `output_stream` - (Optional) The output stream of the transform. Only required if the transform changes data to a different stream.
+- `streams` - (Required) List of streams for this data flow.
+- `transform_kql` - (Optional) The KQL query to transform stream data.
+DESCRIPTION
+  nullable    = false
+}
+
+variable "data_sources" {
   type = object({
-    key_vault_resource_id = string
-    key_name              = string
-    key_version           = optional(string, null)
-    user_assigned_identity = optional(object({
-      resource_id = string
+    data_imports = optional(object({
+      event_hub = optional(object({
+        consumer_group = optional(string, null)
+        name           = string
+        stream         = optional(string, null)
+      }), null)
     }), null)
+    extensions = optional(list(object({
+      extension_name     = string
+      extension_settings = optional(any, null)
+      input_data_sources = optional(list(string), null)
+      name               = string
+      streams            = list(string)
+    })), [])
+    iis_logs = optional(list(object({
+      log_directories = optional(list(string), null)
+      name            = string
+      streams         = list(string)
+      transform_kql   = optional(string, null)
+    })), [])
+    log_files = optional(list(object({
+      file_patterns = list(string)
+      format        = string
+      name          = string
+      settings = optional(object({
+        text = object({
+          record_start_timestamp_format = string
+        })
+      }), null)
+      streams       = list(string)
+      transform_kql = optional(string, null)
+    })), [])
+    performance_counters = optional(list(object({
+      counter_specifiers            = list(string)
+      name                          = string
+      sampling_frequency_in_seconds = number
+      streams                       = list(string)
+      transform_kql                 = optional(string, null)
+    })), [])
+    platform_telemetry = optional(list(object({
+      name    = string
+      streams = list(string)
+    })), [])
+    prometheus_forwarder = optional(list(object({
+      label_include_filter = optional(map(string), null)
+      name                 = string
+      streams              = list(string)
+    })), [])
+    syslog = optional(list(object({
+      facility_names = list(string)
+      log_levels     = list(string)
+      name           = string
+      streams        = list(string)
+      transform_kql  = optional(string, null)
+    })), [])
+    windows_event_logs = optional(list(object({
+      name           = string
+      streams        = list(string)
+      transform_kql  = optional(string, null)
+      x_path_queries = list(string)
+    })), [])
+    windows_firewall_logs = optional(list(object({
+      name           = string
+      profile_filter = optional(list(string), null)
+      streams        = list(string)
+    })), [])
   })
   default     = null
   description = <<DESCRIPTION
-A map describing customer-managed keys to associate with the resource. This includes the following properties:
-- `key_vault_resource_id` - The resource ID of the Key Vault where the key is stored.
-- `key_name` - The name of the key.
-- `key_version` - (Optional) The version of the key. If not specified, the latest version is used.
-- `user_assigned_identity` - (Optional) An object representing a user-assigned identity with the following properties:
-  - `resource_id` - The resource ID of the user-assigned identity.
-DESCRIPTION  
+The specification of data sources for the data collection rule. This property is optional and can be omitted if the rule is meant to be used via direct calls to the provisioned endpoint.
+
+- `data_imports` - (Optional) Specifications of pull based data sources.
+  - `event_hub` - (Optional) Event Hub data import configuration.
+- `extensions` - (Optional) The list of Azure VM extension data source configurations.
+- `iis_logs` - (Optional) The list of IIS logs source configurations.
+- `log_files` - (Optional) The list of log files source configurations.
+- `performance_counters` - (Optional) The list of performance counter data source configurations.
+- `platform_telemetry` - (Optional) The list of platform telemetry configurations.
+- `prometheus_forwarder` - (Optional) The list of Prometheus forwarder data source configurations.
+- `syslog` - (Optional) The list of Syslog data source configurations.
+- `windows_event_logs` - (Optional) The list of Windows Event Log data source configurations.
+- `windows_firewall_logs` - (Optional) The list of Windows Firewall logs source configurations.
+DESCRIPTION
+}
+
+variable "destinations" {
+  type = object({
+    azure_data_explorer = optional(list(object({
+      database_name = string
+      name          = string
+      resource_id   = string
+    })), [])
+    azure_monitor_metrics = optional(object({
+      name = string
+    }), null)
+    event_hubs = optional(list(object({
+      event_hub_resource_id = string
+      name                  = string
+    })), [])
+    event_hubs_direct = optional(list(object({
+      event_hub_resource_id = string
+      name                  = string
+    })), [])
+    log_analytics = optional(list(object({
+      name                  = string
+      workspace_resource_id = string
+    })), [])
+    microsoft_fabric = optional(list(object({
+      artifact_id   = string
+      database_name = string
+      ingestion_uri = string
+      name          = string
+      tenant_id     = optional(string, null)
+    })), [])
+    monitoring_accounts = optional(list(object({
+      account_resource_id = string
+      name                = string
+    })), [])
+    storage_accounts = optional(list(object({
+      container_name              = string
+      name                        = string
+      storage_account_resource_id = string
+    })), [])
+    storage_blobs_direct = optional(list(object({
+      container_name              = string
+      name                        = string
+      storage_account_resource_id = string
+    })), [])
+    storage_tables_direct = optional(list(object({
+      name                        = string
+      storage_account_resource_id = string
+      table_name                  = string
+    })), [])
+  })
+  default     = null
+  description = <<DESCRIPTION
+The specification of destinations for the data collection rule.
+
+- `azure_data_explorer` - (Optional) List of Azure Data Explorer destinations.
+- `azure_monitor_metrics` - (Optional) Azure Monitor Metrics destination.
+- `event_hubs` - (Optional) List of Event Hubs destinations.
+- `event_hubs_direct` - (Optional) List of Event Hubs Direct destinations.
+- `log_analytics` - (Optional) List of Log Analytics destinations.
+- `microsoft_fabric` - (Optional) List of Microsoft Fabric destinations.
+- `monitoring_accounts` - (Optional) List of monitoring account destinations.
+- `storage_accounts` - (Optional) List of storage accounts destinations.
+- `storage_blobs_direct` - (Optional) List of Storage Blob Direct destinations.
+- `storage_tables_direct` - (Optional) List of Storage Table Direct destinations.
+DESCRIPTION
+}
+
+variable "stream_declarations" {
+  type = map(object({
+    columns = list(object({
+      name = string
+      type = string
+    }))
+  }))
+  default     = {}
+  description = <<DESCRIPTION
+Declaration of custom streams used in this rule. The map key is the stream name (e.g., "Custom-MyStream").
+
+- `columns` - (Required) List of column definitions for the custom stream.
+  - `name` - (Required) The name of the column.
+  - `type` - (Required) The type of the column data. Possible values are `boolean`, `datetime`, `dynamic`, `int`, `long`, `real`, `string`.
+DESCRIPTION
+  nullable    = false
+}
+
+variable "data_collection_endpoint_id" {
+  type        = string
+  default     = null
+  description = "The resource ID of the data collection endpoint that this rule can be used with."
+}
+
+variable "description" {
+  type        = string
+  default     = null
+  description = "A description of the data collection rule."
+}
+
+variable "kind" {
+  type        = string
+  default     = null
+  description = "The kind of the data collection rule. Possible values are `Linux` and `Windows`."
+
+  validation {
+    condition     = var.kind == null || contains(["Linux", "Windows"], var.kind)
+    error_message = "The kind must be one of: 'Linux', 'Windows', or null."
+  }
 }
 
 variable "diagnostic_settings" {
@@ -60,7 +250,7 @@ variable "diagnostic_settings" {
   }))
   default     = {}
   description = <<DESCRIPTION
-A map of diagnostic settings to create on the Key Vault. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
+A map of diagnostic settings to create on the data collection rule. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
 
 - `name` - (Optional) The name of the diagnostic setting. One will be generated if not set, however this will not be unique if you want to create multiple diagnostic setting resources.
 - `log_categories` - (Optional) A set of log categories to send to the log analytics workspace. Defaults to `[]`.
@@ -71,8 +261,8 @@ A map of diagnostic settings to create on the Key Vault. The map key is delibera
 - `storage_account_resource_id` - (Optional) The resource ID of the storage account to send logs and metrics to.
 - `event_hub_authorization_rule_resource_id` - (Optional) The resource ID of the event hub authorization rule to send logs and metrics to.
 - `event_hub_name` - (Optional) The name of the event hub. If none is specified, the default event hub will be selected.
-- `marketplace_partner_resource_id` - (Optional) The full ARM resource ID of the Marketplace resource to which you would like to send Diagnostic LogsLogs.
-DESCRIPTION  
+- `marketplace_partner_resource_id` - (Optional) The full ARM resource ID of the Marketplace resource to which you would like to send Diagnostic Logs.
+DESCRIPTION
   nullable    = false
 
   validation {
@@ -89,6 +279,8 @@ DESCRIPTION
     error_message = "At least one of `workspace_resource_id`, `storage_account_resource_id`, `marketplace_partner_resource_id`, or `event_hub_authorization_rule_resource_id`, must be set."
   }
 }
+
+# --- AVM interface variables ---
 
 variable "enable_telemetry" {
   type        = bool
@@ -110,17 +302,16 @@ variable "lock" {
   description = <<DESCRIPTION
 Controls the Resource Lock configuration for this resource. The following properties can be specified:
 
-- `kind` - (Required) The type of lock. Possible values are `\"CanNotDelete\"` and `\"ReadOnly\"`.
+- `kind` - (Required) The type of lock. Possible values are `"CanNotDelete"` and `"ReadOnly"`.
 - `name` - (Optional) The name of the lock. If not specified, a name will be generated based on the `kind` value. Changing this forces the creation of a new resource.
 DESCRIPTION
 
   validation {
     condition     = var.lock != null ? contains(["CanNotDelete", "ReadOnly"], var.lock.kind) : true
-    error_message = "The lock level must be one of: 'None', 'CanNotDelete', or 'ReadOnly'."
+    error_message = "The lock level must be one of: 'CanNotDelete', or 'ReadOnly'."
   }
 }
 
-# tflint-ignore: terraform_unused_declarations
 variable "managed_identities" {
   type = object({
     system_assigned            = optional(bool, false)
@@ -136,70 +327,6 @@ DESCRIPTION
   nullable    = false
 }
 
-variable "private_endpoints" {
-  type = map(object({
-    name = optional(string, null)
-    role_assignments = optional(map(object({
-      role_definition_id_or_name             = string
-      principal_id                           = string
-      description                            = optional(string, null)
-      skip_service_principal_aad_check       = optional(bool, false)
-      condition                              = optional(string, null)
-      condition_version                      = optional(string, null)
-      delegated_managed_identity_resource_id = optional(string, null)
-    })), {})
-    lock = optional(object({
-      kind = string
-      name = optional(string, null)
-    }), null)
-    tags                                    = optional(map(string), null)
-    subnet_resource_id                      = string
-    private_dns_zone_group_name             = optional(string, "default")
-    private_dns_zone_resource_ids           = optional(set(string), [])
-    application_security_group_associations = optional(map(string), {})
-    private_service_connection_name         = optional(string, null)
-    network_interface_name                  = optional(string, null)
-    location                                = optional(string, null)
-    resource_group_name                     = optional(string, null)
-    ip_configurations = optional(map(object({
-      name               = string
-      private_ip_address = string
-    })), {})
-  }))
-  default     = {}
-  description = <<DESCRIPTION
-A map of private endpoints to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-
-- `name` - (Optional) The name of the private endpoint. One will be generated if not set.
-- `role_assignments` - (Optional) A map of role assignments to create on the private endpoint. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time. See `var.role_assignments` for more information.
-- `lock` - (Optional) The lock level to apply to the private endpoint. Default is `None`. Possible values are `None`, `CanNotDelete`, and `ReadOnly`.
-- `tags` - (Optional) A mapping of tags to assign to the private endpoint.
-- `subnet_resource_id` - The resource ID of the subnet to deploy the private endpoint in.
-- `private_dns_zone_group_name` - (Optional) The name of the private DNS zone group. One will be generated if not set.
-- `private_dns_zone_resource_ids` - (Optional) A set of resource IDs of private DNS zones to associate with the private endpoint. If not set, no zone groups will be created and the private endpoint will not be associated with any private DNS zones. DNS records must be managed external to this module.
-- `application_security_group_resource_ids` - (Optional) A map of resource IDs of application security groups to associate with the private endpoint. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-- `private_service_connection_name` - (Optional) The name of the private service connection. One will be generated if not set.
-- `network_interface_name` - (Optional) The name of the network interface. One will be generated if not set.
-- `location` - (Optional) The Azure location where the resources will be deployed. Defaults to the location of the resource group.
-- `resource_group_name` - (Optional) The resource group where the resources will be deployed. Defaults to the resource group of this resource.
-- `ip_configurations` - (Optional) A map of IP configurations to create on the private endpoint. If not specified the platform will create one. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-  - `name` - The name of the IP configuration.
-  - `private_ip_address` - The private IP address of the IP configuration.
-DESCRIPTION
-  nullable    = false
-}
-
-# This variable is used to determine if the private_dns_zone_group block should be included,
-# or if it is to be managed externally, e.g. using Azure Policy.
-# https://github.com/Azure/terraform-azurerm-avm-res-keyvault-vault/issues/32
-# Alternatively you can use AzAPI, which does not have this issue.
-variable "private_endpoints_manage_dns_zone_group" {
-  type        = bool
-  default     = true
-  description = "Whether to manage private DNS zone groups with this module. If set to false, you must manage private DNS zone groups externally, e.g. using Azure Policy."
-  nullable    = false
-}
-
 variable "role_assignments" {
   type = map(object({
     role_definition_id_or_name             = string
@@ -209,6 +336,7 @@ variable "role_assignments" {
     condition                              = optional(string, null)
     condition_version                      = optional(string, null)
     delegated_managed_identity_resource_id = optional(string, null)
+    principal_type                         = optional(string, null)
   }))
   default     = {}
   description = <<DESCRIPTION
@@ -216,17 +344,18 @@ A map of role assignments to create on this resource. The map key is deliberatel
 
 - `role_definition_id_or_name` - The ID or name of the role definition to assign to the principal.
 - `principal_id` - The ID of the principal to assign the role to.
-- `description` - The description of the role assignment.
-- `skip_service_principal_aad_check` - If set to true, skips the Azure Active Directory check for the service principal in the tenant. Defaults to false.
-- `condition` - The condition which will be used to scope the role assignment.
-- `condition_version` - The version of the condition syntax. Valid values are '2.0'.
+- `description` - (Optional) The description of the role assignment.
+- `skip_service_principal_aad_check` - (Optional) If set to true, skips the Azure Active Directory check for the service principal in the tenant. Defaults to false.
+- `condition` - (Optional) The condition which will be used to scope the role assignment.
+- `condition_version` - (Optional) The version of the condition syntax. Valid values are '2.0'.
+- `delegated_managed_identity_resource_id` - (Optional) The delegated Azure Resource Id which contains a Managed Identity.
+- `principal_type` - (Optional) The type of the `principal_id`. Possible values are `User`, `Group` and `ServicePrincipal`.
 
 > Note: only set `skip_service_principal_aad_check` to true if you are assigning a role to a service principal.
 DESCRIPTION
   nullable    = false
 }
 
-# tflint-ignore: terraform_unused_declarations
 variable "tags" {
   type        = map(string)
   default     = null

@@ -1,29 +1,104 @@
-# TODO: Replace this dummy resource azurerm_resource_group.TODO with your module resource
-resource "azurerm_resource_group" "TODO" {
-  location = var.location
-  name     = var.name # calling code must supply the name
-  tags     = var.tags
+resource "azapi_resource" "this" {
+  type      = "Microsoft.Insights/dataCollectionRules@2023-03-11"
+  parent_id = var.resource_group_resource_id
+  name      = var.name
+  location  = var.location
+  tags      = var.tags
+
+  body = {
+    kind = var.kind
+    properties = {
+      for k, v in local.body_properties : k => v
+      if v != null
+    }
+  }
+
+  dynamic "identity" {
+    for_each = local.identity != null ? [local.identity] : []
+
+    content {
+      type         = identity.value.type
+      identity_ids = identity.value.userAssignedIdentities != null ? keys(identity.value.userAssignedIdentities) : []
+    }
+  }
+
+  response_export_values = [
+    "properties.immutableId",
+    "properties.provisioningState",
+  ]
 }
 
-# required AVM resources interfaces
-resource "azurerm_management_lock" "this" {
+resource "azapi_resource" "lock" {
   count = var.lock != null ? 1 : 0
 
-  lock_level = var.lock.kind
-  name       = coalesce(var.lock.name, "lock-${var.lock.kind}")
-  scope      = azurerm_MY_RESOURCE.this.id # TODO: Replace with your azurerm resource name
-  notes      = var.lock.kind == "CanNotDelete" ? "Cannot delete the resource or its child resources." : "Cannot delete or modify the resource or its child resources."
+  type      = "Microsoft.Authorization/locks@2020-05-01"
+  parent_id = azapi_resource.this.id
+  name      = coalesce(var.lock.name, "lock-${var.lock.kind}")
+
+  body = {
+    properties = {
+      level = var.lock.kind
+      notes = var.lock.kind == "CanNotDelete" ? "Cannot delete the resource or its child resources." : "Cannot delete or modify the resource or its child resources."
+    }
+  }
+
+  response_export_values = []
 }
 
-resource "azurerm_role_assignment" "this" {
+resource "azapi_resource" "role_assignment" {
   for_each = var.role_assignments
 
-  principal_id                           = each.value.principal_id
-  scope                                  = azurerm_resource_group.TODO.id # TODO: Replace this dummy resource azurerm_resource_group.TODO with your module resource
-  condition                              = each.value.condition
-  condition_version                      = each.value.condition_version
-  delegated_managed_identity_resource_id = each.value.delegated_managed_identity_resource_id
-  role_definition_id                     = strcontains(lower(each.value.role_definition_id_or_name), lower(local.role_definition_resource_substring)) ? each.value.role_definition_id_or_name : null
-  role_definition_name                   = strcontains(lower(each.value.role_definition_id_or_name), lower(local.role_definition_resource_substring)) ? null : each.value.role_definition_id_or_name
-  skip_service_principal_aad_check       = each.value.skip_service_principal_aad_check
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  parent_id = azapi_resource.this.id
+  name      = each.value.role_definition_id_or_name
+
+  body = {
+    properties = {
+      principalId      = each.value.principal_id
+      roleDefinitionId = strcontains(lower(each.value.role_definition_id_or_name), lower(local.role_definition_resource_substring)) ? each.value.role_definition_id_or_name : "/providers/Microsoft.Authorization/roleDefinitions/${each.value.role_definition_id_or_name}"
+      principalType    = each.value.principal_type
+      description      = each.value.description
+      condition        = each.value.condition
+      conditionVersion = each.value.condition_version
+    }
+  }
+
+  response_export_values = []
+}
+
+resource "azapi_resource" "diagnostic_setting" {
+  for_each = var.diagnostic_settings
+
+  type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+  parent_id = azapi_resource.this.id
+  name      = each.value.name != null ? each.value.name : "diag-${each.key}"
+
+  body = {
+    properties = {
+      workspaceId                 = each.value.workspace_resource_id
+      storageAccountId            = each.value.storage_account_resource_id
+      eventHubAuthorizationRuleId = each.value.event_hub_authorization_rule_resource_id
+      eventHubName                = each.value.event_hub_name
+      marketplacePartnerId        = each.value.marketplace_partner_resource_id
+      logAnalyticsDestinationType = each.value.log_analytics_destination_type
+
+      logs = concat(
+        [for cat in each.value.log_categories : {
+          category = cat
+          enabled  = true
+        }],
+        [for group in each.value.log_groups : {
+          categoryGroup = group
+          enabled       = true
+        }]
+      )
+
+      metrics = [for cat in each.value.metric_categories : {
+        category = cat
+        enabled  = true
+      }]
+    }
+  }
+
+  response_export_values = []
 }
