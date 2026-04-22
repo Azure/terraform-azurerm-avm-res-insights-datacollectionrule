@@ -14,6 +14,15 @@ locals {
 locals {
   # Build the ARM body.properties object from typed variables
   body_properties = {
+    agentSettings = var.agent_settings != null ? {
+      logs = length(var.agent_settings.logs) > 0 ? [
+        for s in var.agent_settings.logs : {
+          name  = s.name
+          value = s.value
+        }
+      ] : null
+    } : null
+
     description              = var.description
     dataCollectionEndpointId = var.data_collection_endpoint_id
 
@@ -198,6 +207,19 @@ locals {
           tableName                = std.table_name
         }
       ] : null
+    } : null
+
+    references = var.references != null ? {
+      enrichmentData = var.references.enrichment_data != null ? {
+        storageBlobs = length(var.references.enrichment_data.storage_blobs) > 0 ? [
+          for sb in var.references.enrichment_data.storage_blobs : {
+            blobUrl    = sb.blob_url
+            lookupType = sb.lookup_type
+            name       = sb.name
+            resourceId = sb.resource_id
+          }
+        ] : null
+      } : null
     } : null
 
     streamDeclarations = length(var.stream_declarations) > 0 ? {

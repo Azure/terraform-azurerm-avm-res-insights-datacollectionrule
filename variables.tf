@@ -212,6 +212,23 @@ DESCRIPTION
   nullable    = false
 }
 
+variable "agent_settings" {
+  type = object({
+    logs = optional(list(object({
+      name  = string
+      value = string
+    })), [])
+  })
+  default     = null
+  description = <<DESCRIPTION
+Agent settings used to modify agent behavior on a given host.
+
+- `logs` - (Optional) All the settings that are applicable to the logs agent (AMA).
+  - `name` - (Required) The name of the setting. Supported values: `MaxDiskQuotaInMB`, `UseTimeReceivedForForwardedEvents`.
+  - `value` - (Required) The value of the setting.
+DESCRIPTION
+}
+
 variable "data_collection_endpoint_id" {
   type        = string
   default     = null
@@ -233,6 +250,30 @@ variable "kind" {
     condition     = var.kind == null || contains(["Linux", "Windows"], var.kind)
     error_message = "The kind must be one of: 'Linux', 'Windows', or null."
   }
+}
+
+variable "references" {
+  type = object({
+    enrichment_data = optional(object({
+      storage_blobs = optional(list(object({
+        blob_url    = string
+        lookup_type = string
+        name        = string
+        resource_id = string
+      })), [])
+    }), null)
+  })
+  default     = null
+  description = <<DESCRIPTION
+Defines all the references that may be used in other sections of the DCR.
+
+- `enrichment_data` - (Optional) All the enrichment data sources referenced in data flows.
+  - `storage_blobs` - (Optional) All the storage blobs used as enrichment data sources.
+    - `blob_url` - (Required) URL of the storage blob.
+    - `lookup_type` - (Required) The type of lookup to perform on the blob. Possible values: `Cidr`, `String`.
+    - `name` - (Required) The name of the enrichment data source used as an alias when referencing in data flows.
+    - `resource_id` - (Required) Resource ID of the storage account that hosts the blob.
+DESCRIPTION
 }
 
 variable "diagnostic_settings" {
