@@ -6,16 +6,12 @@ This deploys the module in its simplest form.
 
 ```hcl
 terraform {
-  required_version = "~> 1.5"
+  required_version = ">= 1.9, < 2.0"
 
   required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 3.74"
-    }
-    modtm = {
-      source  = "azure/modtm"
-      version = "~> 0.3"
+    azapi = {
+      source  = "Azure/azapi"
+      version = "~> 2.4"
     }
     random = {
       source  = "hashicorp/random"
@@ -24,50 +20,71 @@ terraform {
   }
 }
 
-provider "azurerm" {
-  features {}
+provider "azapi" {}
+
+resource "random_pet" "name" {
+  length = 2
 }
 
-
-## Section to provide a random Azure region for the resource group
-# This allows us to randomize the region for the resource group.
-module "regions" {
-  source  = "Azure/regions/azurerm"
-  version = "~> 0.3"
+# Create a resource group
+resource "azapi_resource" "resource_group" {
+  location               = "eastus"
+  name                   = "rg-${random_pet.name.id}"
+  type                   = "Microsoft.Resources/resourceGroups@2024-03-01"
+  body                   = {}
+  response_export_values = []
 }
 
-# This allows us to randomize the region for the resource group.
-resource "random_integer" "region_index" {
-  max = length(module.regions.regions) - 1
-  min = 0
-}
-## End of section to provide a random Azure region for the resource group
-
-# This ensures we have unique CAF compliant names for our resources.
-module "naming" {
-  source  = "Azure/naming/azurerm"
-  version = "~> 0.3"
-}
-
-# This is required for resource modules
-resource "azurerm_resource_group" "this" {
-  location = module.regions.regions[random_integer.region_index.result].name
-  name     = module.naming.resource_group.name_unique
+# Create a Log Analytics workspace as a destination
+resource "azapi_resource" "log_analytics_workspace" {
+  location  = azapi_resource.resource_group.location
+  name      = "law-${random_pet.name.id}"
+  parent_id = azapi_resource.resource_group.id
+  type      = "Microsoft.OperationalInsights/workspaces@2023-09-01"
+  body = {
+    properties = {
+      sku = {
+        name = "PerGB2018"
+      }
+      retentionInDays = 30
+    }
+  }
+  response_export_values = []
 }
 
 # This is the module call
-# Do not specify location here due to the randomization above.
-# Leaving location as `null` will cause the module to use the resource group location
-# with a data source.
 module "test" {
   source = "../../"
 
-  # source             = "Azure/avm-<res/ptn>-<name>/azurerm"
-  # ...
-  location            = azurerm_resource_group.this.location
-  name                = "TODO" # TODO update with module.naming.<RESOURCE_TYPE>.name_unique
-  resource_group_name = azurerm_resource_group.this.name
-  enable_telemetry    = var.enable_telemetry # see variables.tf
+  location  = azapi_resource.resource_group.location
+  name      = "dcr-${random_pet.name.id}"
+  parent_id = azapi_resource.resource_group.id
+  data_flows = [
+    {
+      destinations = ["law-dest"]
+      streams      = ["Microsoft-Perf"]
+    }
+  ]
+  data_sources = {
+    performance_counters = [
+      {
+        name                          = "perfcounter-datasource"
+        counter_specifiers            = ["\\Processor(_Total)\\% Processor Time", "\\Memory\\Available Bytes"]
+        sampling_frequency_in_seconds = 60
+        streams                       = ["Microsoft-Perf"]
+      }
+    ]
+  }
+  destinations = {
+    log_analytics = [
+      {
+        name                  = "law-dest"
+        workspace_resource_id = azapi_resource.log_analytics_workspace.id
+      }
+    ]
+  }
+  enable_telemetry = var.enable_telemetry
+  kind             = "Windows"
 }
 ```
 
@@ -76,11 +93,9 @@ module "test" {
 
 The following requirements are needed by this module:
 
-- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (~> 1.5)
+- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.9, < 2.0)
 
-- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (~> 3.74)
-
-- <a name="requirement_modtm"></a> [modtm](#requirement\_modtm) (~> 0.3)
+- <a name="requirement_azapi"></a> [azapi](#requirement\_azapi) (~> 2.4)
 
 - <a name="requirement_random"></a> [random](#requirement\_random) (~> 3.5)
 
@@ -88,8 +103,9 @@ The following requirements are needed by this module:
 
 The following resources are used by this module:
 
-- [azurerm_resource_group.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) (resource)
-- [random_integer.region_index](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/integer) (resource)
+- [azapi_resource.log_analytics_workspace](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.resource_group](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [random_pet.name](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/pet) (resource)
 
 <!-- markdownlint-disable MD013 -->
 ## Required Inputs
@@ -117,18 +133,6 @@ No outputs.
 ## Modules
 
 The following Modules are called:
-
-### <a name="module_naming"></a> [naming](#module\_naming)
-
-Source: Azure/naming/azurerm
-
-Version: ~> 0.3
-
-### <a name="module_regions"></a> [regions](#module\_regions)
-
-Source: Azure/regions/azurerm
-
-Version: ~> 0.3
 
 ### <a name="module_test"></a> [test](#module\_test)
 
