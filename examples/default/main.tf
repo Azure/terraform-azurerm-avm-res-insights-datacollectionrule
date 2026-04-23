@@ -49,9 +49,9 @@ resource "azapi_resource" "log_analytics_workspace" {
 module "test" {
   source = "../../"
 
-  location                   = azapi_resource.resource_group.location
-  name                       = "dcr-${random_pet.name.id}"
-  resource_group_resource_id = azapi_resource.resource_group.id
+  location  = azapi_resource.resource_group.location
+  name      = "dcr-${random_pet.name.id}"
+  parent_id = azapi_resource.resource_group.id
   data_flows = [
     {
       destinations = ["law-dest"]

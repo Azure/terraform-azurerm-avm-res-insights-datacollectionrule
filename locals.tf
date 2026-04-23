@@ -1,13 +1,4 @@
 locals {
-  # Identity block for the DCR resource
-  identity = (var.managed_identities.system_assigned || length(var.managed_identities.user_assigned_resource_ids) > 0) ? {
-    type = var.managed_identities.system_assigned && length(var.managed_identities.user_assigned_resource_ids) > 0 ? "SystemAssigned,UserAssigned" : length(var.managed_identities.user_assigned_resource_ids) > 0 ? "UserAssigned" : "SystemAssigned"
-    userAssignedIdentities = length(var.managed_identities.user_assigned_resource_ids) > 0 ? {
-      for id in var.managed_identities.user_assigned_resource_ids : id => {}
-    } : null
-  } : null
-  # Role definition resource substring for distinguishing IDs from names
-  role_definition_resource_substring = "/providers/Microsoft.Authorization/roleDefinitions"
 }
 
 locals {

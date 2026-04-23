@@ -1,7 +1,19 @@
+module "avm_interfaces" {
+  source  = "Azure/avm-utl-interfaces/azure"
+  version = "~> 0.1"
+
+  diagnostic_settings                       = var.diagnostic_settings
+  lock                                      = var.lock
+  managed_identities                        = var.managed_identities
+  role_assignment_definition_lookup_enabled = length(var.role_assignments) > 0
+  role_assignment_definition_scope          = var.parent_id
+  role_assignments                          = var.role_assignments
+}
+
 resource "azapi_resource" "this" {
   location  = var.location
   name      = var.name
-  parent_id = var.resource_group_resource_id
+  parent_id = var.parent_id
   type      = "Microsoft.Insights/dataCollectionRules@2024-03-11"
   body = {
     kind = var.kind
@@ -28,11 +40,11 @@ resource "azapi_resource" "this" {
   update_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
 
   dynamic "identity" {
-    for_each = local.identity != null ? [local.identity] : []
+    for_each = module.avm_interfaces.managed_identities_azapi != null ? [module.avm_interfaces.managed_identities_azapi] : []
 
     content {
       type         = identity.value.type
-      identity_ids = identity.value.userAssignedIdentities != null ? keys(identity.value.userAssignedIdentities) : []
+      identity_ids = identity.value.identity_ids
     }
   }
 }
@@ -40,15 +52,10 @@ resource "azapi_resource" "this" {
 resource "azapi_resource" "lock" {
   count = var.lock != null ? 1 : 0
 
-  name      = coalesce(var.lock.name, "lock-${var.lock.kind}")
-  parent_id = azapi_resource.this.id
-  type      = "Microsoft.Authorization/locks@2020-05-01"
-  body = {
-    properties = {
-      level = var.lock.kind
-      notes = var.lock.kind == "CanNotDelete" ? "Cannot delete the resource or its child resources." : "Cannot delete or modify the resource or its child resources."
-    }
-  }
+  name                   = module.avm_interfaces.lock_azapi.name
+  parent_id              = azapi_resource.this.id
+  type                   = module.avm_interfaces.lock_azapi.type
+  body                   = module.avm_interfaces.lock_azapi.body
   create_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
   delete_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
   read_headers           = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
@@ -56,26 +63,13 @@ resource "azapi_resource" "lock" {
   update_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
 }
 
-resource "random_uuid" "role_assignment" {
-  for_each = var.role_assignments
-}
-
 resource "azapi_resource" "role_assignment" {
-  for_each = var.role_assignments
+  for_each = module.avm_interfaces.role_assignments_azapi
 
-  name      = random_uuid.role_assignment[each.key].result
-  parent_id = azapi_resource.this.id
-  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
-  body = {
-    properties = {
-      principalId      = each.value.principal_id
-      roleDefinitionId = strcontains(lower(each.value.role_definition_id_or_name), lower(local.role_definition_resource_substring)) ? each.value.role_definition_id_or_name : "/providers/Microsoft.Authorization/roleDefinitions/${each.value.role_definition_id_or_name}"
-      principalType    = each.value.principal_type
-      description      = each.value.description
-      condition        = each.value.condition
-      conditionVersion = each.value.condition_version
-    }
-  }
+  name                   = each.value.name
+  parent_id              = azapi_resource.this.id
+  type                   = each.value.type
+  body                   = each.value.body
   create_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
   delete_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
   read_headers           = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
@@ -84,37 +78,12 @@ resource "azapi_resource" "role_assignment" {
 }
 
 resource "azapi_resource" "diagnostic_setting" {
-  for_each = var.diagnostic_settings
+  for_each = module.avm_interfaces.diagnostic_settings_azapi
 
-  name      = each.value.name != null ? each.value.name : "diag-${each.key}"
-  parent_id = azapi_resource.this.id
-  type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
-  body = {
-    properties = {
-      workspaceId                 = each.value.workspace_resource_id
-      storageAccountId            = each.value.storage_account_resource_id
-      eventHubAuthorizationRuleId = each.value.event_hub_authorization_rule_resource_id
-      eventHubName                = each.value.event_hub_name
-      marketplacePartnerId        = each.value.marketplace_partner_resource_id
-      logAnalyticsDestinationType = each.value.log_analytics_destination_type
-
-      logs = concat(
-        [for cat in each.value.log_categories : {
-          category = cat
-          enabled  = true
-        }],
-        [for group in each.value.log_groups : {
-          categoryGroup = group
-          enabled       = true
-        }]
-      )
-
-      metrics = [for cat in each.value.metric_categories : {
-        category = cat
-        enabled  = true
-      }]
-    }
-  }
+  name                   = each.value.name
+  parent_id              = azapi_resource.this.id
+  type                   = each.value.type
+  body                   = each.value.body
   create_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
   delete_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
   read_headers           = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null

@@ -14,7 +14,7 @@ variable "name" {
   nullable    = false
 }
 
-variable "resource_group_resource_id" {
+variable "parent_id" {
   type        = string
   description = "The resource ID of the resource group in which to create the data collection rule."
   nullable    = false
