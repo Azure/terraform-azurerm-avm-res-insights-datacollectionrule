@@ -31,6 +31,7 @@ mock_provider "random" {
     }
   }
 }
+mock_provider "azurerm" {}
 
 variables {
   location                   = "eastus"
