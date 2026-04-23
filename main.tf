@@ -1,15 +1,3 @@
-module "avm_interfaces" {
-  source  = "Azure/avm-utl-interfaces/azure"
-  version = "~> 0.1"
-
-  diagnostic_settings                       = var.diagnostic_settings
-  lock                                      = var.lock
-  managed_identities                        = var.managed_identities
-  role_assignment_definition_lookup_enabled = length(var.role_assignments) > 0
-  role_assignment_definition_scope          = var.parent_id
-  role_assignments                          = var.role_assignments
-}
-
 resource "azapi_resource" "this" {
   location  = var.location
   name      = var.name
@@ -47,46 +35,4 @@ resource "azapi_resource" "this" {
       identity_ids = identity.value.identity_ids
     }
   }
-}
-
-resource "azapi_resource" "lock" {
-  count = var.lock != null ? 1 : 0
-
-  name                   = module.avm_interfaces.lock_azapi.name
-  parent_id              = azapi_resource.this.id
-  type                   = module.avm_interfaces.lock_azapi.type
-  body                   = module.avm_interfaces.lock_azapi.body
-  create_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  delete_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  read_headers           = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  response_export_values = []
-  update_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-}
-
-resource "azapi_resource" "role_assignment" {
-  for_each = module.avm_interfaces.role_assignments_azapi
-
-  name                   = each.value.name
-  parent_id              = azapi_resource.this.id
-  type                   = each.value.type
-  body                   = each.value.body
-  create_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  delete_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  read_headers           = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  response_export_values = []
-  update_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-}
-
-resource "azapi_resource" "diagnostic_setting" {
-  for_each = module.avm_interfaces.diagnostic_settings_azapi
-
-  name                   = each.value.name
-  parent_id              = azapi_resource.this.id
-  type                   = each.value.type
-  body                   = each.value.body
-  create_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  delete_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  read_headers           = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  response_export_values = []
-  update_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
 }
