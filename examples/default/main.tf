@@ -76,6 +76,6 @@ module "test" {
       }
     ]
   }
-  enable_telemetry = var.enable_telemetry
+  enable_telemetry = false
   kind             = "Windows"
 }
