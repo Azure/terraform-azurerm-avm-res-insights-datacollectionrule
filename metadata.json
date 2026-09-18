@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Azure/azure-verified-modules-tools/main/src/Avm.Authoring/Resources/Schemas/v1/avm-module-metadata.schema.json",
+  "moduleDisplayName": "Data Collection Rule",
+  "moduleDescription": "AVM Resource Module for Data Collection Rule",
+  "canonicalType": "Microsoft.Insights/dataCollectionRules",
+  "owners": [
+    "ethanjenkins1"
+  ],
+  "telemetryIdPrefix": "46d3xtrf.res.821fc33"
+}
