@@ -16,7 +16,7 @@ mock_provider "azapi" {
     }
   }
 }
-mock_provider "modtm" {}
+
 mock_provider "random" {
   mock_resource "random_uuid" {
     defaults = {
@@ -83,14 +83,22 @@ run "basic_dcr_creation" {
     condition     = output.resource_id != ""
     error_message = "Output resource_id should not be empty."
   }
+  providers = {
+    azapi  = azapi
+    random = random
+  }
 }
 
 run "telemetry_enabled_by_default" {
   command = apply
 
   assert {
-    condition     = length(modtm_telemetry.telemetry) == 1
+    condition     = length(azapi_resource.telemetry) == 1
     error_message = "Telemetry resource should be created when enable_telemetry is true (default)."
+  }
+  providers = {
+    azapi  = azapi
+    random = random
   }
 }
 
@@ -102,8 +110,12 @@ run "telemetry_disabled" {
   }
 
   assert {
-    condition     = length(modtm_telemetry.telemetry) == 0
+    condition     = length(azapi_resource.telemetry) == 0
     error_message = "Telemetry resource should not be created when enable_telemetry is false."
+  }
+  providers = {
+    azapi  = azapi
+    random = random
   }
 }
 
@@ -126,6 +138,10 @@ run "lock_creation" {
     condition     = azapi_resource.lock[0].name == "test-lock"
     error_message = "Lock name should be 'test-lock'."
   }
+  providers = {
+    azapi  = azapi
+    random = random
+  }
 }
 
 run "no_lock_by_default" {
@@ -134,6 +150,10 @@ run "no_lock_by_default" {
   assert {
     condition     = length(azapi_resource.lock) == 0
     error_message = "Lock resource should not be created when lock is null."
+  }
+  providers = {
+    azapi  = azapi
+    random = random
   }
 }
 
@@ -150,5 +170,9 @@ run "minimal_dcr_no_data_sources" {
   assert {
     condition     = azapi_resource.this.name == "test-dcr"
     error_message = "Minimal DCR should be created successfully."
+  }
+  providers = {
+    azapi  = azapi
+    random = random
   }
 }
