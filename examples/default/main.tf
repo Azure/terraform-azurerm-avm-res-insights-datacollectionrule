@@ -48,9 +48,6 @@ resource "azapi_resource" "log_analytics_workspace" {
 # This is the module call
 module "test" {
   source = "../../"
-  providers = {
-    azapi = azapi
-  }
 
   location  = azapi_resource.resource_group.location
   name      = "dcr-${random_pet.name.id}"
